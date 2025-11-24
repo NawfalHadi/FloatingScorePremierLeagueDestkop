@@ -2,6 +2,8 @@
 Watch premier league score from another games, while you only can watch one games that currently lives. <br>
 the scoreboard will be always in front of your apps
 
+### The Scoreboard Only Shows the match of today. 
+
 ![Scorer](assets/readme/score.png)
 
 # Next Update : 
