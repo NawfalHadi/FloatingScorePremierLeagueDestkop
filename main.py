@@ -400,3 +400,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SmartTicker(root)
     root.mainloop()
+
+#  all of this are generated A.I btw 😂😂
