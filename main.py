@@ -8,9 +8,10 @@ from PIL import Image, ImageTk
 
 # --- CONFIGURATION ---
 ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard"
-REFRESH_RATE = 15         
+REFRESH_RATE = 60         
 ANIMATION_SPEED = 40      
-SCROLL_STEP = 2           
+SCROLL_STEP = 2
+ALERT_DURATION = 60       # Notification stays for 60 seconds
 BG_COLOR = "#202124"
 TEXT_COLOR = "#ffffff"
 ACCENT_COLOR = "#3d195b"
@@ -87,10 +88,14 @@ class SmartTicker:
         self.root = root
         self.image_cache = {}
         self.last_scores = {}       
-        self.active_alerts = {}     
-        self.active_bubbles = []    
         self.match_details_cache = {} 
-        self.current_matches = [] # Store current match list for testing
+        self.current_matches = [] 
+
+        # --- LOGIC UPDATES ---
+        # active_alerts format: { match_id: {'text': "Goal!", 'expires': timestamp} }
+        self.active_alerts = {}     
+        # active_bubbles format: [ [match_id, container_widget, bubble_window], ... ]
+        self.active_bubbles = []    
 
         self.scroll_x = 0
         self.content_width = 0
@@ -121,7 +126,6 @@ class SmartTicker:
         controls.bind("<Button-1>", self.start_move)
         controls.bind("<B1-Motion>", self.do_move)
 
-        # Buttons: Close, Refresh, Test
         for btn_text, col, func in [("✕", "#ff9999", self.close_app), ("⟳", "#00ff00", self.manual_refresh), ("T", "#00ccff", self.run_test_notification)]:
             lbl = tk.Label(controls, text=btn_text, bg=ACCENT_COLOR, fg=col, font=("Arial", 9, "bold"), cursor="hand2", width=3)
             lbl.pack(side=tk.LEFT, fill=tk.Y)
@@ -161,31 +165,53 @@ class SmartTicker:
     def on_match_click(self, event, match_id):
         threading.Thread(target=self.run_once, daemon=True).start()
 
-    # --- ANIMATION ---
+    # --- ANIMATION & TIME MANAGEMENT ---
     def animate_ticker(self):
         if self.running:
             if not self.user_is_hovering:
                 self.scroll_x -= SCROLL_STEP
-                # --- ROTATION LOGIC ---
                 if self.scroll_x < -self.content_width:
-                    # 1. Reset position
                     self.scroll_x = self.clip_frame.winfo_width()
-                    # 2. CLEAR BUBBLES ON ROTATION END (This satisfies your requirement)
-                    self.clear_all_bubbles()
+                    # REMOVED: self.clear_all_bubbles() 
+                    # Reason: We now rely on time, not rotation.
                     
                 self.ticker_frame.place(x=self.scroll_x, y=0, relheight=1.0)
+                self.check_expired_alerts() # Check for 60s timeout
                 self.sync_bubbles()
             self.root.after(ANIMATION_SPEED, self.animate_ticker)
+
+    def check_expired_alerts(self):
+        """Checks if any alert has passed its 60s lifespan."""
+        now = time.time()
+        
+        # 1. Identify expired IDs
+        expired_ids = [mid for mid, data in self.active_alerts.items() if now > data['expires']]
+        
+        # 2. Remove from logic dict
+        for mid in expired_ids:
+            del self.active_alerts[mid]
+
+        # 3. Visually destroy expired bubbles immediately
+        # Filter active_bubbles list: Keep only those whose Match ID is still in active_alerts
+        # If match ID is NOT in active_alerts, destroy the window
+        new_active_bubbles = []
+        for mid, cont, win in self.active_bubbles:
+            if mid in self.active_alerts:
+                new_active_bubbles.append([mid, cont, win])
+            else:
+                win.destroy() # Poof!
+        
+        self.active_bubbles = new_active_bubbles
 
     def sync_bubbles(self):
         root_x = self.root.winfo_x()
         root_y = self.root.winfo_y()
         clip_w = self.clip_frame.winfo_width()
         ctrl_w = self.root.winfo_width() - clip_w
-        for widget, bubble in self.active_bubbles:
+        
+        for mid, widget, bubble in self.active_bubbles:
             try:
                 widget_x = widget.winfo_x()
-                # Calculate screen X based on scroll position
                 screen_x = root_x + ctrl_w + self.scroll_x + widget_x
                 
                 # Only show if inside window bounds
@@ -193,14 +219,8 @@ class SmartTicker:
                     bubble.withdraw()
                 else:
                     bubble.deiconify()
-                    # Position bubble over the match container
                     bubble.update_position(screen_x + 40, root_y)
             except: pass
-
-    def clear_all_bubbles(self):
-        for _, bubble in self.active_bubbles: bubble.destroy()
-        self.active_bubbles = []
-        self.active_alerts = {}
 
     # --- PARSERS ---
     def get_player_name_from_detail(self, detail):
@@ -269,8 +289,7 @@ class SmartTicker:
             r = requests.get(ESPN_URL)
             events = r.json().get('events', [])
             parsed_matches = []
-            active_alerts_this_loop = {}
-
+            
             for e in events:
                 m = self.parse_espn_match(e)
                 if m:
@@ -278,30 +297,34 @@ class SmartTicker:
                     mid = m['id']
                     curr_score = f"{m['home']['score']}-{m['away']['score']}"
                     self.match_details_cache[mid] = m['history_list']
+
+                    # --- NEW ALERT LOGIC ---
                     if mid in self.last_scores:
                         if curr_score != self.last_scores[mid]:
-                            if m['last_event']: active_alerts_this_loop[mid] = m['last_event']
+                            if m['last_event']:
+                                # STORE WITH EXPIRY TIME
+                                self.active_alerts[mid] = {
+                                    'text': m['last_event'],
+                                    'expires': time.time() + ALERT_DURATION
+                                }
+                    
                     self.last_scores[mid] = curr_score
 
-            # Only update alerts if we have new ones (don't clear test alerts instantly)
-            if active_alerts_this_loop:
-                self.active_alerts.update(active_alerts_this_loop)
-            
-            # Save for Test Button
-            self.current_matches = parsed_matches
-            
+            self.current_matches = parsed_matches # Update stored list for test btn
             self.root.after(0, lambda: self.render_matches(parsed_matches))
             self.root.after(0, lambda: self.btn_refresh.config(fg="#00ff00"))
         except: pass
 
     def render_matches(self, matches):
-        # Clear widgets and old bubbles
+        # 1. Clear Widgets
         for w in self.ticker_frame.winfo_children(): w.destroy()
-        for _, b in self.active_bubbles: b.destroy()
+        
+        # 2. Clear Bubble Visuals (Logic persists in active_alerts)
+        for _, _, b in self.active_bubbles: b.destroy()
         self.active_bubbles = []
 
         if not matches:
-            tk.Label(self.ticker_frame, text="NO MATCHES", bg=BG_COLOR, fg="#666").pack(side=tk.LEFT, padx=10)
+            tk.Label(self.ticker_frame, text="NO MATCHES TODAY", bg=BG_COLOR, fg="#666").pack(side=tk.LEFT, padx=10)
             self.update_ticker_width()
             return
 
@@ -319,19 +342,19 @@ class SmartTicker:
             tk.Label(cont, text=m['time'], bg=BG_COLOR, fg="#00ff00", font=("Arial", 7, "bold")).pack(side=tk.LEFT)
             h_img = self.get_team_icon(m['home']['tla'], m['home']['logo'])
             if h_img: tk.Label(cont, image=h_img, bg=BG_COLOR).pack(side=tk.LEFT)
-            
             stxt = f" {m['home']['tla']} {m['home']['score']}-{m['away']['score']} {m['away']['tla']} "
             tk.Label(cont, text=stxt, bg=BG_COLOR, fg=TEXT_COLOR, font=("Consolas", 9, "bold")).pack(side=tk.LEFT)
-            
             a_img = self.get_team_icon(m['away']['tla'], m['away']['logo'])
             if a_img: tk.Label(cont, image=a_img, bg=BG_COLOR).pack(side=tk.LEFT)
-            
             tk.Label(self.ticker_frame, text="||", bg=BG_COLOR, fg="#444").pack(side=tk.LEFT, padx=5)
 
-            # TRACK CONTAINER FOR BUBBLE POSITIONING
+            # --- CREATE BUBBLE ONLY IF TIME HAS NOT EXPIRED ---
             if mid in self.active_alerts:
-                bubble = GoalBubble(self.root, self.active_alerts[mid], -100, -100)
-                self.active_bubbles.append([cont, bubble])
+                alert_data = self.active_alerts[mid]
+                # Double check time (safety)
+                if time.time() < alert_data['expires']:
+                    bubble = GoalBubble(self.root, alert_data['text'], -100, -100)
+                    self.active_bubbles.append([mid, cont, bubble])
 
         self.update_ticker_width()
 
@@ -358,32 +381,27 @@ class SmartTicker:
         threading.Thread(target=self.run_once, daemon=True).start()
 
     def run_test_notification(self):
-        """Forces a Goal Notification on a match that has scores."""
         target_match = None
-        
-        # 1. Try to find a match that actually has events
+        # Try to find a real match first
         if self.current_matches:
-            target_match = self.current_matches[0] # Default to first
-            # Or try to find one with goals?
-            for m in self.current_matches:
-                if m['home']['score'] > 0 or m['away']['score'] > 0:
-                    target_match = m
-                    break
+            target_match = self.current_matches[0]
         else:
-            # 2. If no matches exist, create a dummy one
-            target_match = {
-                'id': '999', 'time': "88'", 
-                'home': {'tla': 'TES', 'logo': '', 'score': 2}, 
-                'away': {'tla': 'DSG', 'logo': '', 'score': 1}, 
-                'history_list': [], 'last_event': ""
-            }
-            self.current_matches = [target_match]
+            # Fallback
+            target_match = {'id': '999', 'time': "88'", 'home': {'tla': 'TES', 'logo': '', 'score': 2}, 'away': {'tla': 'DSG', 'logo': '', 'score': 1}, 'history_list': [], 'last_event': ""}
+            self.render_matches([target_match])
 
-        # 3. Force the Alert
         if target_match:
             mid = target_match['id']
-            self.active_alerts[mid] = "TEST GOAL! (90')"
-            self.render_matches(self.current_matches)
+            # SET EXPIRY TO NOW + 60s
+            self.active_alerts[mid] = {
+                'text': "TEST GOAL! (90')",
+                'expires': time.time() + ALERT_DURATION
+            }
+            # Re-render to show the bubble immediately
+            if self.current_matches:
+                self.render_matches(self.current_matches)
+            else:
+                self.render_matches([target_match])
 
     def update_data_loop(self):
         while self.running:
@@ -393,12 +411,10 @@ class SmartTicker:
     def close_app(self):
         self.running = False
         self.hover_tip.destroy()
-        for _, b in self.active_bubbles: b.destroy()
+        for _, _, b in self.active_bubbles: b.destroy()
         self.root.destroy()
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = SmartTicker(root)
     root.mainloop()
-
-#  all of this are generated A.I btw 😂😂
