@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Sculpting Parameters - Visualization</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --bar-bg: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 40px;
+        }
+
+        .submenu-section {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            padding: 20px;
+            page-break-inside: avoid;
+        }
+
+        .submenu-title {
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            font-size: 1.5rem;
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+
+        .label-col {
+            flex: 0 0 250px;
+            padding-right: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .option-name {
+            font-weight: bold;
+        }
+
+        .param-name {
+            font-size: 0.8rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        .bar-col {
+            flex: 1;
+            background-color: var(--bar-bg);
+            height: 24px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 12px 0 0 12px;
+            width: 0%; /* Animate to width */
+            transition: width 1s ease-in-out;
+        }
+
+        .value-col {
+            flex: 0 0 40px;
+            text-align: right;
+            font-weight: bold;
+            padding-left: 10px;
+        }
+
+        .scale-markers {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #999;
+            margin-left: 265px; /* Match label-col width + padding */
+            margin-right: 50px; /* Match value-col width + padding */
+            margin-bottom: 20px;
+        }
+
+        /* Color coding for different values */
+        .val-low .bar-fill { background: #e74c3c; } /* Red for low */
+        .val-mid .bar-fill { background: #95a5a6; } /* Grey for neutral */
+        .val-high .bar-fill { background: #2ecc71; } /* Green for high */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Advanced Sculpting Configuration</h1>
+    <div id="charts-container">
+        </div>
+</div>
+
+<script>
+    // Data derived from analysis
+    const sculptingData = [
+        // --- HEAD ---
+        { submenu: "Head", layer: "Skeletal", option: "Skull", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull", param: "Down ↔ Up", value: 6 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull", param: "Neutral ↔ Forward", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull", param: "Shift Left ↔ Shift Right", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Crown", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Crown", param: "Down ↔ Up", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Crown", param: "Back ↔ Forward", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Back", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Back", param: "Down ↔ Up", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Back", param: "Back ↔ Forward", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Skull Back", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Head", layer: "Skeletal", option: "Temples", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Head", layer: "Skeletal", option: "Temples", param: "Down ↔ Up", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Temples", param: "Back ↔ Forward", value: 5 },
+        { submenu: "Head", layer: "Skeletal", option: "Temples", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Head", layer: "Flesh", option: "Temples", param: "Less ↔ More", value: 7 },
+
+        // --- FOREHEAD ---
+        { submenu: "Forehead", layer: "Skeletal", option: "Upper Forehead", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Forehead", layer: "Skeletal", option: "Upper Forehead", param: "Up", value: 5 },
+        { submenu: "Forehead", layer: "Skeletal", option: "Upper Forehead", param: "Back ↔ Forward", value: 4 },
+        { submenu: "Forehead", layer: "Skeletal", option: "Upper Forehead", param: "Round ↔ Angular", value: 3 },
+        { submenu: "Forehead", layer: "Skeletal", option: "Lower Forehead", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Forehead", layer: "Fat", option: "Forehead Center", param: "Less ↔ More", value: 7 },
+        { submenu: "Forehead", layer: "Fat", option: "Forehead Sides", param: "Less ↔ More", value: 7 },
+
+        // --- BROWS ---
+        { submenu: "Brows", layer: "Skeletal", option: "Eyebrows", param: "Narrow ↔ Widen", value: 5 },
+        { submenu: "Brows", layer: "Skeletal", option: "Eyebrows", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Brows", layer: "Skeletal", option: "Eyebrows", param: "Round ↔ Angular", value: 3 },
+        { submenu: "Brows", layer: "Skeletal", option: "Eyebrows Center", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Brows", layer: "Skeletal", option: "Eyebrows Outside Top", param: "Down ↔ Up", value: 4 },
+        { submenu: "Brows", layer: "Flesh", option: "Eyebrows Center", param: "Less ↔ More", value: 7 },
+        { submenu: "Brows", layer: "Flesh", option: "Eyebrow Gap", param: "Less ↔ More", value: 5 },
+
+        // --- EYES ---
+        { submenu: "Eyes", layer: "Skeletal", option: "Eyes", param: "Larger ↔ Smaller", value: 4 },
+        { submenu: "Eyes", layer: "Flesh", option: "Eyelid Fold Center", param: "Up", value: 6 },
+        { submenu: "Eyes", layer: "Flesh", option: "Eyelid Fold Outer", param: "Down ↔ Up", value: 4 },
+        { submenu: "Eyes", layer: "Fat", option: "Eyelid Upper", param: "Less ↔ More", value: 6 },
+        { submenu: "Eyes", layer: "Fat", option: "Eyelid Lower", param: "Less ↔ More", value: 7 },
+        { submenu: "Eyes", layer: "Fat", option: "Under-Eye Lower", param: "Less ↔ More", value: 8 },
+
+        // --- EARS ---
+        { submenu: "Ears", layer: "Flesh", option: "Ear Outside Bottom", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Ears", layer: "Flesh", option: "Earlobe", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Ears", layer: "Fat", option: "Ear Outside Bottom", param: "Less ↔ More", value: 6 },
+
+        // --- NOSE ---
+        { submenu: "Nose", layer: "Skeletal", option: "Nose", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose Bridge Sides", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose Bridge Sides", param: "Back ↔ Forward", value: 4 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose Bridge Sides", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose Bridge Center", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Nose", layer: "Skeletal", option: "Nose Bridge Upper", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Upper", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Upper Outer", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Lower", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Lower", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Outside Outer", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Flesh", option: "Nostril Outside Center", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Upper", param: "Narrow ↔ Widen", value: 8 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Upper", param: "Round ↔ Angular", value: 1 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Under", param: "Narrow ↔ Widen", value: 8 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Under", param: "Down ↔ Up", value: 4 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Under", param: "Round ↔ Angular", value: 1 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Lower", param: "Narrow ↔ Widen", value: 8 },
+        { submenu: "Nose", layer: "Flesh", option: "Nose Tip Lower", param: "Round ↔ Angular", value: 1 },
+        { submenu: "Nose", layer: "Fat", option: "Nose", param: "Less ↔ More", value: 8 },
+
+        // --- CHEEKS ---
+        { submenu: "Cheeks", layer: "Skeletal", option: "Cheeks", param: "Narrow ↔ Widen", value: 8 },
+        { submenu: "Cheeks", layer: "Skeletal", option: "Cheeks", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Cheeks", layer: "Skeletal", option: "Cheeks", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Cheeks", layer: "Flesh", option: "Cheeks", param: "Less ↔ More", value: 9 },
+        { submenu: "Cheeks", layer: "Flesh", option: "Upper Outside Cheeks", param: "Less ↔ More", value: 8 },
+        { submenu: "Cheeks", layer: "Flesh", option: "Upper Inside Eyes", param: "Less ↔ More", value: 7 },
+        { submenu: "Cheeks", layer: "Flesh", option: "Upper Inside Cheeks", param: "Less ↔ More", value: 8 },
+        { submenu: "Cheeks", layer: "Fat", option: "Upper Cheeks", param: "Less ↔ More", value: 8 },
+        { submenu: "Cheeks", layer: "Fat", option: "Lower Cheeks", param: "Less ↔ More", value: 9 },
+        { submenu: "Cheeks", layer: "Fat", option: "Jowl", param: "Down ↔ Up", value: 4 },
+        { submenu: "Cheeks", layer: "Fat", option: "Jowl", param: "Less ↔ More", value: 7 },
+        { submenu: "Cheeks", layer: "Fat", option: "Cheeks Inside Upper", param: "Less ↔ More", value: 7 },
+        { submenu: "Cheeks", layer: "Fat", option: "Cheeks Inside Lower", param: "Less ↔ More", value: 8 },
+        { submenu: "Cheeks", layer: "Fat", option: "Temples", param: "Less ↔ More", value: 7 },
+
+        // --- MOUTH ---
+        { submenu: "Mouth", layer: "Skeletal", option: "Mouth", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Mouth", layer: "Skeletal", option: "Mouth", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Skeletal", option: "Mouth Outside Top", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Mouth", layer: "Skeletal", option: "Mouth Outside Top", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Mouth Corners", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Mouth Corners", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lip Gap Center", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Upper Lip Top Center", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Upper Lip Top Center", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Upper Lip Bottom Center", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Upper Lip Bottom Center", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Upper Lip Fullness", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Philtrum", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Fullness", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Fullness", param: "Back ↔ Forward", value: 7 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Top Center", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Top Sides", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Top Sides", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Bottom Center", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Bottom Sides", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Mouth", layer: "Flesh", option: "Lower Lip Bottom Sides", param: "Back ↔ Forward", value: 6 },
+        { submenu: "Mouth", layer: "Flesh", option: "Mouth Corner Grooves", param: "Neutral ↔ Less", value: 8 },
+        { submenu: "Mouth", layer: "Fat", option: "Mouth Sides", param: "Less ↔ More", value: 8 },
+        { submenu: "Mouth", layer: "Fat", option: "Upper Lip", param: "Less ↔ More", value: 6 },
+        { submenu: "Mouth", layer: "Fat", option: "Lower Lip", param: "Less ↔ More", value: 8 },
+
+        // --- CHIN ---
+        { submenu: "Chin", layer: "Skeletal", option: "Chin", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Chin", layer: "Skeletal", option: "Chin", param: "Back ↔ Forward", value: 4 },
+        { submenu: "Chin", layer: "Skeletal", option: "Chin", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Chin", layer: "Skeletal", option: "Upper Chin", param: "Narrow ↔ Widen", value: 6 },
+        { submenu: "Chin", layer: "Skeletal", option: "Upper Chin", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Chin", layer: "Fat", option: "Chin", param: "Less ↔ More", value: 7 },
+        { submenu: "Chin", layer: "Fat", option: "Under Chin", param: "Less ↔ More", value: 7 },
+
+        // --- JAW ---
+        { submenu: "Jaw", layer: "Skeletal", option: "Jaw", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Jaw", layer: "Skeletal", option: "Jaw", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Jaw", layer: "Skeletal", option: "Inside Jaw Top", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Jaw", layer: "Skeletal", option: "Inside Jaw Top", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Jaw", layer: "Skeletal", option: "Inside Jaw Bottom", param: "Narrow ↔ Widen", value: 7 },
+        { submenu: "Jaw", layer: "Skeletal", option: "Inside Jaw Bottom", param: "Round ↔ Angular", value: 2 },
+        { submenu: "Jaw", layer: "Flesh", option: "Jaw", param: "Less ↔ More", value: 8 },
+        { submenu: "Jaw", layer: "Fat", option: "Jaw", param: "Less ↔ More", value: 8 }
+    ];
+
+    function renderCharts() {
+        const container = document.getElementById('charts-container');
+        
+        // Group data by submenu
+        const groupedData = sculptingData.reduce((acc, item) => {
+            if (!acc[item.submenu]) acc[item.submenu] = [];
+            acc[item.submenu].push(item);
+            return acc;
+        }, {});
+
+        for (const [submenu, items] of Object.entries(groupedData)) {
+            const section = document.createElement('div');
+            section.className = 'submenu-section';
+            
+            const title = document.createElement('h2');
+            title.className = 'submenu-title';
+            title.textContent = submenu;
+            section.appendChild(title);
+
+            // Create scale markers once per section
+            const markers = document.createElement('div');
+            markers.className = 'scale-markers';
+            markers.innerHTML = '<span>0</span><span>2.5</span><span>5 (Neutral)</span><span>7.5</span><span>10</span>';
+            section.appendChild(markers);
+
+            items.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'chart-row';
+                
+                // Determine color class based on value
+                let valClass = 'val-mid';
+                if (item.value <= 3) valClass = 'val-low';
+                else if (item.value >= 7) valClass = 'val-high';
+
+                row.classList.add(valClass);
+
+                row.innerHTML = `
+                    <div class="label-col">
+                        <span class="option-name">${item.option}</span>
+                        <span class="param-name">${item.layer} - ${item.param}</span>
+                    </div>
+                    <div class="bar-col">
+                        <div class="bar-fill" style="width: ${item.value * 10}%"></div>
+                    </div>
+                    <div class="value-col">${item.value}</div>
+                `;
+                section.appendChild(row);
+            });
+
+            container.appendChild(section);
+        }
+    }
+
+    // Initialize
+    window.onload = renderCharts;
+</script>
+
+</body>
+</html>

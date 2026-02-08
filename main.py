@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 
 # --- CONFIGURATION ---
 ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard"
+# ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"
 REFRESH_RATE = 60         
 ANIMATION_SPEED = 40      
 SCROLL_STEP = 2

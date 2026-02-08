@@ -3,3 +3,4 @@ no_scorer.py
 build/
 dist/
 EplFloatingScore.spec
+test/
